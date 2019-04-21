@@ -139,15 +139,14 @@ def M_step(phi, gamma, docs, k, V):
     return alpha, beta
 
 
-class LDA():
+class LDA(object):
     def __init__(self, k=10, V=100):
         self.k = k
         self.V = V
 
         #parameters
-        self.alpha = np.random.gamma(2,2,k)
+        self.alpha = np.random.gamma(2, 2, k)
         self.beta = np.ones((k, V))/V
-
 
     def fit(self, docs, max_iter=100):
         """
@@ -161,3 +160,8 @@ class LDA():
             print("finished E")
             self.alpha, self.beta = M_step(phi, gamma, docs, self.k, self.V)
             print("finished M")
+
+
+class Generator(object):
+    def __init__(self, k, V,n):
+        return
