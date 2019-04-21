@@ -1,4 +1,4 @@
-    #!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Created on Fri Mar 29 21:06:28 2019
@@ -51,6 +51,33 @@ def data_simulation_numba(M, k, V, xi=100, shape=2, scale=1):
     return docs, alpha, beta
 
 
+@jit(nopython=True)
+def digamma2(x):
+   #referenced to https://people.sc.fsu.edu/~jburkardt/py_src/asa103/digamma.py
+  if ( x <= 0.0 ):
+    value = 0.0
+    return value
+  value = 0.0
+  if ( x <= 0.000001 ):
+    euler_mascheroni = 0.57721566490153286060
+    value = - euler_mascheroni - 1.0 / x + 1.6449340668482264365 * x
+    return value
+  while ( x < 8.5 ):
+    value = value - 1.0 / x
+    x = x + 1.0
+  r = 1.0 / x
+  value = value + np.log ( x ) - 0.5 * r
+  r = r * r
+  value = value \
+    - r * ( 1.0 / 12.0 \
+    - r * ( 1.0 / 120.0 \
+    - r * ( 1.0 / 252.0 \
+    - r * ( 1.0 / 240.0 \
+    - r * ( 1.0 / 132.0 ) ) ) ) )
+
+  return value
+
+
 def E_one_step(doc, V, alpha, beta, phi0, gamma0, tol=1e-3):
     '''
     :param doc: only one document
@@ -80,7 +107,7 @@ def E_one_step(doc, V, alpha, beta, phi0, gamma0, tol=1e-3):
             tmp_phi,tmp_gamma = phi, gamma
     return phi, gamma
 
-@jit
+@jit(nopython=True)
 def E_one_step_numba(doc, V, alpha, beta, phi0, gamma0, tol=1e-3):
     '''
     :param doc: only one document
@@ -101,7 +128,7 @@ def E_one_step_numba(doc, V, alpha, beta, phi0, gamma0, tol=1e-3):
     for i in range(MAX_E_ITER):
         for n in range(N):
             for j in range(topic_num):
-                phi[n, j] = (beta[j,].T@doc[n,]) * np.exp(digamma(gamma[i])-digamma(sum(gamma)))
+                phi[n, j] = (beta[j,].T@doc[n,]) * np.exp(digamma2(gamma[i])-digamma2(np.sum(gamma)))
             phi[n,] = phi[n,] / np.sum(phi[n,])
         gamma = alpha + np.sum(phi,axis=0).T
         if((np.sum((phi - tmp_phi) ** 2) <= tol) and (np.sum((gamma - tmp_gamma) ** 2) <= tol)):
@@ -154,7 +181,7 @@ def _ss(gamma):
 
 @jit
 def _ss_numba(gamma):
-    return digamma(gamma) - digamma(gamma.sum(1))[:, np.newaxis]
+    return digamma2(gamma) - digamma2(gamma.sum(1))[:, np.newaxis]
 
 
 def alhood(a, ss, M, k):
@@ -170,7 +197,7 @@ def d_alhood(a, ss, M, k):
 
 @jit
 def d_alhood_numba(a, ss, M, k):
-    return M * (digamma(np.sum(a)) - (digamma(a))) + np.sum(ss, axis=0)
+    return M * (digamma2(np.sum(a)) - (digamma2(a))) + np.sum(ss, axis=0)
 
 
 def d2_alhood(a, M):
@@ -251,8 +278,8 @@ def M_step_numba(phi, gamma, docs, k, V):
     M = len(docs)
 
     ##update alpha
-    ss = _ss_numba(gamma)
-    alpha = optimal_a_numba(ss, M, k)
+    ss = _ss(gamma)
+    alpha = optimal_a(ss, M, k)
 
     ##update beta
     beta = np.zeros((k, V))
@@ -284,11 +311,11 @@ class LDA():
         self.phi = [np.ones((doc.shape[0], self.k))/self.k for doc in docs]
         self.gamma = np.ones((M,self.k))
         for i in range(max_iter):
-            print("step %d"%i)
+            #print("step %d"%i)
             self.phi, self.gamma = E_step(docs, self.k, self.V, self.alpha, self.beta)
-            print("finished E")
+           # print("finished E")
             self.alpha, self.beta = M_step(self.phi, self.gamma, docs, self.k, self.V)
-            print("finished M")
+            #print("finished M")
         return self.phi,self.gamma,self.alpha,self.beta
     
     
@@ -302,9 +329,9 @@ class LDA():
         self.phi = [np.ones((doc.shape[0], self.k))/self.k for doc in docs]
         self.gamma = np.ones((M,self.k))
         for i in range(max_iter):
-            print("step %d"%i)
+            #print("step %d"%i)
             self.phi, self.gamma = E_step_numba(docs, self.k, self.V, self.alpha, self.beta)
-            print("finished E")
+            #print("finished E")
             self.alpha, self.beta = M_step_numba(self.phi, self.gamma, docs, self.k, self.V)
-            print("finished M")
+            #print("finished M")
         return self.phi,self.gamma,self.alpha,self.beta
