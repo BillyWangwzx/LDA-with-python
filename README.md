@@ -2,6 +2,6 @@
 
 Please install our package directly by:
 
-Pip install ldaa 
+pip install ldaa 
 
 Then you can run all ipynb files directly by importing libraries 
