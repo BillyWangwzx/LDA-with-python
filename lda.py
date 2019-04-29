@@ -8,23 +8,6 @@ MAX_E_ITER = 500
 NEWTON_THRESH = 1e-10
 
 
-def data_simulation(M, k, V, xi=100, shape=2, scale=1):
-    docs = []
-    alpha = np.random.gamma(shape=shape, scale=scale, size=k)
-    beta = np.random.dirichlet(np.ones(V), k)
-    N = np.random.poisson(lam=xi, size=M)
-    theta = np.random.dirichlet(alpha, M)
-
-    for d in range(M):
-        z = np.random.multinomial(n=1, pvals=theta[d,], size=N[d])
-        tmp = z @ beta
-        w = np.zeros((N[d], V))
-        for n in range(N[d]):
-            w[n,] = np.random.multinomial(n=1, pvals=tmp[n,], size=1)
-        docs.append(w)
-    return docs, alpha, beta
-
-
 def E_one_step(doc, V, alpha, beta, phi0, gamma0, tol=1e-3):
     '''
     :param doc: only one document
@@ -34,7 +17,7 @@ def E_one_step(doc, V, alpha, beta, phi0, gamma0, tol=1e-3):
     :param gamma0:
     :param max_iter:
     :param tol:
-    :return: phi(N*V), gamma(K*1)
+    :return: phi(N*k), gamma(K*1)
     '''
     N = doc.shape[0]
     topic_num = len(alpha)
@@ -43,20 +26,21 @@ def E_one_step(doc, V, alpha, beta, phi0, gamma0, tol=1e-3):
     tmp_phi, tmp_gamma = phi0, gamma0
     delta_phi, delta_gamma = 9999, 9999
 
-    for i in range(MAX_E_ITER):
+    for _ in range(MAX_E_ITER):
         for n in range(N):
-            for j in range(topic_num):
-                phi[n, j] = np.sum(beta[j, ] * doc[n, ]) * np.exp(digamma(gamma[j]))
-            phi[n,] = phi[n,] / np.sum(phi[n,])
-            gamma = alpha + np.sum(phi[n,])
-            delta_phi = np.sum((phi - tmp_phi) ** 2)
-            delta_gamma = np.sum((gamma - tmp_gamma) ** 2)
-            tmp_phi, tmp_gamma = phi, gamma
-            if ((delta_phi <= tol) and (delta_gamma <= tol)):
-                break
-            else:
-                continue
+            digamma_temp = digamma(gamma[i])
+            for i in range(topic_num):
+                phi[n, i] = np.sum(beta[i, ] * doc[n, ]) * np.exp(digamma_temp)
+            phi[n, ] = phi[n, ] / np.sum(phi[n, ])
+        gamma = alpha + np.sum(phi, axis=0)
+        delta_phi = np.sum((phi - tmp_phi) ** 2)
+        delta_gamma = np.sum((gamma - tmp_gamma) ** 2)
+        tmp_phi, tmp_gamma = phi, gamma
+        if ((delta_phi <= tol) and (delta_gamma <= tol)):
             break
+        else:
+            continue
+        break
     return phi, gamma
 
 

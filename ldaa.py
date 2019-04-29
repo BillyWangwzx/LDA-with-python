@@ -54,19 +54,19 @@ def data_simulation_numba(M, k, V, xi=100, shape=2, scale=1):
 @jit(nopython=True)
 def digamma2(x):
    #referenced to https://people.sc.fsu.edu/~jburkardt/py_src/asa103/digamma.py
-  if ( x <= 0.0 ):
+  if x <= 0.0:
     value = 0.0
     return value
   value = 0.0
-  if ( x <= 0.000001 ):
+  if x <= 0.000001:
     euler_mascheroni = 0.57721566490153286060
     value = - euler_mascheroni - 1.0 / x + 1.6449340668482264365 * x
     return value
-  while ( x < 8.5 ):
+  while x < 8.5:
     value = value - 1.0 / x
     x = x + 1.0
   r = 1.0 / x
-  value = value + np.log ( x ) - 0.5 * r
+  value = value + np.log(x)-0.5 * r
   r = r * r
   value = value \
     - r * ( 1.0 / 12.0 \
@@ -74,8 +74,30 @@ def digamma2(x):
     - r * ( 1.0 / 252.0 \
     - r * ( 1.0 / 240.0 \
     - r * ( 1.0 / 132.0 ) ) ) ) )
-
   return value
+
+
+@jit(nopython=True)
+def trigamma(x):
+    #referenced to https://people.sc.fsu.edu/~jburkardt/cpp_src/asa121/asa121.cpp
+    a = 0.0001
+    b = 5.0
+    b2 = 0.1666666667
+    b4 = -0.03333333333
+    b6 = 0.02380952381
+    b8 = -0.03333333333
+    z = x
+    if x<0:
+        return 0
+    if x < a:
+        return 1/x/x
+    val = 0
+    while z<b:
+        val+=1/z/z
+        z += 1
+    y = 1/z/z
+    val += 0.5*y+(1+y*(b2+y*(b4+y*(b6+y*b8))))/z
+    return val
 
 
 def E_one_step(doc, V, alpha, beta, phi0, gamma0, tol=1e-3):
@@ -98,13 +120,13 @@ def E_one_step(doc, V, alpha, beta, phi0, gamma0, tol=1e-3):
     for i in range(MAX_E_ITER):
         for n in range(N):
             for j in range(topic_num):
-                phi[n, j] = (beta[j,].T@doc[n,]) * np.exp(digamma(gamma[i])-digamma(sum(gamma)))
-            phi[n,] = phi[n,] / np.sum(phi[n,])
-        gamma = alpha + np.sum(phi,axis=0).T
-        if((np.sum((phi - tmp_phi) ** 2) <= tol) and (np.sum((gamma - tmp_gamma) ** 2) <= tol)):
+                phi[n, j] = (beta[j, ].T@doc[n, ]) * np.exp(digamma(gamma[j])-digamma(sum(gamma)))
+            phi[n, ] = phi[n, ] / np.sum(phi[n, ])
+        gamma = alpha + np.sum(phi, axis=0).T
+        if np.sum((phi - tmp_phi) ** 2) <= tol and np.sum((gamma - tmp_gamma) ** 2) <= tol:
             break
         else:
-            tmp_phi,tmp_gamma = phi, gamma
+            tmp_phi, tmp_gamma = phi, gamma
     return phi, gamma
 
 @jit(nopython=True)
@@ -128,13 +150,13 @@ def E_one_step_numba(doc, V, alpha, beta, phi0, gamma0, tol=1e-3):
     for i in range(MAX_E_ITER):
         for n in range(N):
             for j in range(topic_num):
-                phi[n, j] = (beta[j,].T@doc[n,]) * np.exp(digamma2(gamma[i])-digamma2(np.sum(gamma)))
-            phi[n,] = phi[n,] / np.sum(phi[n,])
-        gamma = alpha + np.sum(phi,axis=0).T
-        if((np.sum((phi - tmp_phi) ** 2) <= tol) and (np.sum((gamma - tmp_gamma) ** 2) <= tol)):
+                phi[n, j] = (beta[j, ].T@doc[n, ]) * np.exp(digamma2(gamma[j]))
+            phi[n,] = phi[n, ] / np.sum(phi[n, ])
+        gamma = alpha + np.sum(phi, axis=0)
+        if np.sum((phi - tmp_phi) ** 2) <= tol and np.sum((gamma - tmp_gamma) ** 2) <= tol:
             break
         else:
-            tmp_phi,tmp_gamma = phi, gamma
+            tmp_phi, tmp_gamma = phi, gamma
     return phi, gamma
 
 
@@ -205,7 +227,8 @@ def d2_alhood(a, M):
 
 @jit
 def d2_alhood_numba(a, M):
-    return -M * polygamma(1, a)
+    print(2)
+    return -M * trigamma(a)
 
 
 def optimal_a(ss, M, k):
@@ -216,7 +239,7 @@ def optimal_a(ss, M, k):
         if np.sum(df ** 2) < NEWTON_THRESH:
             break
         d2f = d2_alhood(a, M)
-        z = M * polygamma(1, np.sum(a))
+        z = M * polygamma(1,np.sum(a))
         c = np.sum(df / d2f) / (1 / z + np.sum(1 / d2f))
         a -= (df - c) / d2f
 
@@ -231,7 +254,7 @@ def optimal_a_numba(ss, M, k):
         if np.sum(df ** 2) < NEWTON_THRESH:
             break
         d2f = d2_alhood_numba(a, M)
-        z = M * polygamma(1, np.sum(a))
+        z = M * trigamma(np.sum(a))
         c = np.sum(df / d2f) / (1 / z + np.sum(1 / d2f))
         a -= (df - c) / d2f
 
